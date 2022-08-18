@@ -1,0 +1,4 @@
+mpiprocs=2
+type=driver
+arg="--plumed plumed.dat --trajectory-stride 1 --timestep 0.005 --ixyz 1_pos.xyz"
+

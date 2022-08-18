@@ -127,6 +127,8 @@ public:
   void chainRule(double df);
 /// Get the derivative with respect to component n
   double getDerivative(const unsigned n) const;
+/// Get the gradient of the value
+  const std::map<AtomNumber,Vector> & getGradients()const;
 /// Clear the input force on the variable
   void clearInputForce();
 /// Add some force on this value
@@ -230,6 +232,11 @@ double Value::getDerivative(const unsigned n) const {
   plumed_dbg_massert(n<derivatives.size(),"you are asking for a derivative that is out of bounds");
   return derivatives[n];
 }
+
+inline
+const std::map<AtomNumber,Vector> & Value::getGradients()const {
+    return gradients;
+  }  
 
 inline
 bool Value::hasDerivatives() const {
