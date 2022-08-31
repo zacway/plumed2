@@ -175,6 +175,7 @@ public:
   void getLocalForces(std::vector<Vector>&);
   void getLocalMDForces(std::vector<Vector>&);
   const Tensor& getVirial()const;
+  const Vector getForcesOnAtom(int i)const;
 
   void setCollectEnergy(bool b) { collectEnergy=b; }
 
@@ -258,6 +259,11 @@ const long int& Atoms::getDdStep()const {
 inline
 const std::vector<int>& Atoms::getGatindex()const {
   return gatindex;
+}
+
+inline
+const Vector Atoms::getForcesOnAtom(int i)const {
+    return forces[i];
 }
 
 inline
