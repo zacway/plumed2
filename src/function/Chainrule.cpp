@@ -65,7 +65,8 @@ PRINT ARG=ca FILE=out.file
 
 
 class ChainRule :
-  public Function
+  public Function ,
+  public PLMD::ActionAtomistic
 {
   std::string var;
   std::vector<Vector> forces;
@@ -77,10 +78,26 @@ public:
   explicit ChainRule(const ActionOptions&);
   void calculate() override;
   bool checkNeedsGradients()const override {return true;};
-
+  void lockRequests() override;
+  void unlockRequests() override;
   static void registerKeywords(Keywords& keys);
-};
+  void calculateNumericalDerivatives( ActionWithValue* a=NULL ) override;
 
+
+
+
+};
+inline
+void ChainRule::lockRequests() {
+  ActionWithArguments::lockRequests();
+  ActionAtomistic::lockRequests();
+}
+
+inline
+void ChainRule::unlockRequests() {
+  ActionWithArguments::unlockRequests();
+  ActionAtomistic::unlockRequests();
+}
 
 PLUMED_REGISTER_ACTION(ChainRule,"CHAINRULE")
 
@@ -92,6 +109,8 @@ void ChainRule::registerKeywords(Keywords& keys) {
 
 ChainRule::ChainRule(const ActionOptions&ao):
   Action(ao),
+  ActionAtomistic(ao),
+
   Function(ao),
   first(true)
 {
@@ -101,6 +120,19 @@ ChainRule::ChainRule(const ActionOptions&ao):
   getNumberOfArguments();
   addValueWithDerivatives();
   checkRead();
+
+  
+  std::vector<AtomNumber> Atoms;
+  // TODO PROBLEM : we cant get the AtomNumbers related to the colvar in argument
+  //We need to find a way to access these Atoms where they are already instancied at the time of the call
+  // of ChainRule constructor
+ for(const auto & p : getPntrToArgument(0)->getGradients()) {
+    Atoms.push_back(p.first);
+    std::cout<<p.first.index()<<std::endl;
+  }
+  std::cout<<"debut"<<std::endl;
+      requestAtoms(Atoms);
+
 }
 
 void ChainRule::calculate() {
@@ -118,29 +150,62 @@ void ChainRule::calculate() {
     else if (var =="SPEED") {
       //initialization, the first result is 0.00 due to Numerical derivatives
       if (first==true){
-              atoms.getLocalPositions(positions);
+              // positions=getPositions();
               first=false;
       }
-      atoms.getLocalPositions(positionsTmp);
+
+      positionsTmp=getPositions();
       //numerical derivative of the position
       Vector dposition=(positionsTmp[iatom.index()]-positions[iatom.index()])/atoms.getTimeStep();
       //chainrule for each atom speed
-      for (int i=0;i<3;i++) result+= p.second[i]*dposition[i];
+      // for (int i=0;i<3;i++) result+= p.second[i]*dposition[i];
+      for (int i=0;i<3;i++) result+= dposition[i];
   
       positions=positionsTmp;
     } 
-  setValue(result);
-  
 }
+setValue(result);
 if (var =="DIST") {
-        // ActionAtomistic &a= (getPntrToArgument(0)->getPntrToAction())->getposition();
-        atoms.getLocalPositions(positions);
-        Vector dposition= positions[0]-positions[1];
-        double dist=pow(pow(dposition[0],2)+pow(dposition[1],2)+pow(dposition[2],2),0.5);
+        for(const auto & p : getPntrToArgument(0)->getGradients()) {
+          AtomNumber iatom=p.first;
+          positions=getPositions();
+        // Vector dposition= positions[0]-positions[1];
+        // double dist=pow(pow(dposition[0],2)+pow(dposition[1],2)+pow(dposition[2],2),0.5);
         // setValue(dist);
-        setValue(positions[0][0]);
+        // setValue(0.0);
+          setValue(positions[iatom.index()][0]);
+          return;
+        }
+        // positions=getPositions();
+        // Vector dposition= positions[0]-positions[1];
+        // double dist=pow(pow(dposition[0],2)+pow(dposition[1],2)+pow(dposition[2],2),0.5);
+        // setValue(dist);
+        // setValue(0.0);
+        // setValue(positions[0][0]);
+
       }
 
 }
+
+void ChainRule::calculateNumericalDerivatives( ActionWithValue* a ) {
+  if( getNumberOfArguments()>0 ) {
+    ActionWithArguments::calculateNumericalDerivatives( a );
+  }
+  if( getNumberOfAtoms()>0 ) {
+    Matrix<double> save_derivatives( getNumberOfComponents(), getNumberOfArguments() );
+    for(int j=0; j<getNumberOfComponents(); ++j) {
+      for(unsigned i=0; i<getNumberOfArguments(); ++i) save_derivatives(j,i)=getPntrToComponent(j)->getDerivative(i);
+    }
+    calculateAtomicNumericalDerivatives( a, getNumberOfArguments() );
+    for(int j=0; j<getNumberOfComponents(); ++j) {
+      for(unsigned i=0; i<getNumberOfArguments(); ++i) getPntrToComponent(j)->addDerivative( i, save_derivatives(j,i) );
+    }
+  }
+}
+
 }
 }
+
+
+
+
