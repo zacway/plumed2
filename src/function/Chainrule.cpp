@@ -105,37 +105,39 @@ void ChainRule::registerKeywords(Keywords& keys) {
   Function::registerKeywords(keys);
   keys.use("ARG");keys.use("PERIODIC");
   keys.add("optional","VAR","the parameters the chainrule will derive with respect to ");
+ keys.use("RESTART");
+  keys.use("UPDATE_FROM");
+  keys.use("UPDATE_UNTIL");
 }
 
 ChainRule::ChainRule(const ActionOptions&ao):
   Action(ao),
   ActionAtomistic(ao),
-
   Function(ao),
   first(true)
 {
   parse("VAR",var);
   if (var.size() ==0)
     var="FORCE";
-  getNumberOfArguments();
-  addValueWithDerivatives();
-  checkRead();
+
 
   
   std::vector<AtomNumber> Atoms;
-  // TODO PROBLEM : we cant get the AtomNumbers related to the colvar in argument
-  //We need to find a way to access these Atoms where they are already instancied at the time of the call
-  // of ChainRule constructor
- for(const auto & p : getPntrToArgument(0)->getGradients()) {
+  // TODO PROBLEM : Gradients are not calculated
+  for(unsigned i=0; i<getNumberOfArguments(); ++i)    {
+    std::cout<<getPntrToArgument(i)->getName()<<std::endl;
+    getPntrToArgument(i)->setGradients();
+    for(const auto & p : getPntrToArgument(i)->getGradients()) {
     Atoms.push_back(p.first);
-    std::cout<<p.first.index()<<std::endl;
   }
-  std::cout<<"debut"<<std::endl;
+  }  
       requestAtoms(Atoms);
-
+  addValueWithDerivatives();
+  checkRead();
 }
 
 void ChainRule::calculate() {
+
   double result=0.0;
   //allows to get informations about the atoms
   Atoms& atoms(plumed.getAtoms());    
@@ -150,41 +152,26 @@ void ChainRule::calculate() {
     else if (var =="SPEED") {
       //initialization, the first result is 0.00 due to Numerical derivatives
       if (first==true){
-              // positions=getPositions();
+              std::cout<< "GRADIENTS : "<<       (getPntrToArgument(0)->getPntrToAction())->isOptionOn("GRADIENTS")<<std::endl;
+              std::cout<< "checkNeedsGradients : "<<       (getPntrToArgument(0)->getPntrToAction())->checkNeedsGradients()<<std::endl;
+
+              positions=getPositions();
               first=false;
+              return;
       }
 
       positionsTmp=getPositions();
       //numerical derivative of the position
       Vector dposition=(positionsTmp[iatom.index()]-positions[iatom.index()])/atoms.getTimeStep();
       //chainrule for each atom speed
-      // for (int i=0;i<3;i++) result+= p.second[i]*dposition[i];
-      for (int i=0;i<3;i++) result+= dposition[i];
+      std::cout << p.second[0] << std::endl;
+
+      for (int i=0;i<3;i++) result+= p.second[i]*dposition[i];
   
       positions=positionsTmp;
     } 
 }
 setValue(result);
-if (var =="DIST") {
-        for(const auto & p : getPntrToArgument(0)->getGradients()) {
-          AtomNumber iatom=p.first;
-          positions=getPositions();
-        // Vector dposition= positions[0]-positions[1];
-        // double dist=pow(pow(dposition[0],2)+pow(dposition[1],2)+pow(dposition[2],2),0.5);
-        // setValue(dist);
-        // setValue(0.0);
-          setValue(positions[iatom.index()][0]);
-          return;
-        }
-        // positions=getPositions();
-        // Vector dposition= positions[0]-positions[1];
-        // double dist=pow(pow(dposition[0],2)+pow(dposition[1],2)+pow(dposition[2],2),0.5);
-        // setValue(dist);
-        // setValue(0.0);
-        // setValue(positions[0][0]);
-
-      }
-
 }
 
 void ChainRule::calculateNumericalDerivatives( ActionWithValue* a ) {
